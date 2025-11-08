@@ -12,6 +12,7 @@
     "vite": "^7.1.7"
   },
   "dependencies": {
+    "dotenv": "^17.2.3",
     "satellite.js": "^6.0.1",
     "three": "^0.181.0"
   }
