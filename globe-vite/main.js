@@ -84,20 +84,35 @@ scene.add(stars);
 
 async function fetchTLEsBatch() {
   try {
-    const response = await fetch("http://localhost:3000/tle");
+    const response = await fetch("/active.json"); // local file in public folder
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const lines = (await response.text()).split(/\r?\n/).map(l=>l.trim()).filter(l=>l);
+    
+    const jsonData = await response.json();
+
+    // Each entry already has { name, line1, line2 }
     const tles = [];
-    for(let i=0;i<lines.length;i+=2){
-      const l1 = lines[i], l2 = lines[i+1];
-      if(!l1?.startsWith("1 ") || !l2?.startsWith("2 ")) continue;
-      try { 
-        const satrec = satellite.twoline2satrec(l1,l2);
-        if(satrec.error===0) tles.push({name:`SAT-${i/2+1}`, line1:l1, line2:l2, satrec});
-      } catch {}
+    for (const entry of jsonData.slice(0, 100)) { // limit to 100 satellites
+      try {
+        const satrec = satellite.twoline2satrec(entry.line1, entry.line2);
+        if (satrec.error === 0) {
+          tles.push({
+            name: entry.name,
+            line1: entry.line1,
+            line2: entry.line2,
+            satrec
+          });
+        }
+      } catch (err) {
+        console.warn(`Bad TLE for ${entry.name}:`, err);
+      }
     }
-    return tles.slice(0,50); // limit
-  } catch(e){console.error('TLE fetch error:',e);return [];}
+
+    console.log(`Loaded ${tles.length} satellites from active.json`);
+    return tles;
+  } catch (e) {
+    console.error("TLE JSON load error:", e);
+    return [];
+  }
 }
 
 

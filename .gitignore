@@ -26,3 +26,7 @@ Thumbs.db
 
 # Optional: coverage reports
 coverage/
+
+
+fetch_active_satellites.js
+data/
