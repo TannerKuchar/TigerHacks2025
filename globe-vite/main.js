@@ -130,13 +130,20 @@ function ecefToGlobeCoords(ecef, earthRadius = 1) {
 }
 
 // Create satellite group and meshes
+// Create satellite group and meshes
 const satelliteGroup = new THREE.Group();
 scene.add(satelliteGroup); // CRITICAL: Add to scene
 const satelliteGeometry = new THREE.SphereGeometry(0.03, 8, 8);
-const satelliteMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
 const satelliteMeshes = [];
 const satelliteTLEs = [];
 const satelliteInfo = []; // Store satellite information
+
+// Helper function to create a new satellite mesh with its own material
+function createSatelliteMesh() {
+  const material = new THREE.MeshBasicMaterial({ color: 0xff0000 }); // new instance for each satellite
+  const mesh = new THREE.Mesh(satelliteGeometry, material);
+  return mesh;
+}
 
 function positionTestSatellite(mesh, lat, lon, alt = 1.1) {
   const phi = (90 - lat) * Math.PI / 180;
@@ -163,14 +170,14 @@ async function initializeRealSatellites() {
   console.log('Fetched TLEs:', tles.length);
   if(!tles.length) return;
 
-  tles.forEach((tle,idx)=>{
-    const mesh = new THREE.Mesh(satelliteGeometry,satelliteMaterial);
-    mesh.userData={isTest:false,name:tle.name,index:idx};
-    satelliteGroup.add(mesh);
-    satelliteMeshes.push(mesh);
-    satelliteTLEs.push(tle.satrec);
-    satelliteInfo.push(tle);
-  });
+  tles.forEach((tle, idx) => {
+  const mesh = createSatelliteMesh(); // NEW MATERIAL PER SATELLITE
+  mesh.userData = { isTest: false, name: tle.name, index: idx };
+  satelliteGroup.add(mesh);
+  satelliteMeshes.push(mesh);
+  satelliteTLEs.push(tle.satrec);
+  satelliteInfo.push(tle);
+});
 
   console.log('Created', satelliteMeshes.length, 'satellite meshes');
   console.log('SatelliteGroup children:', satelliteGroup.children.length);
@@ -234,22 +241,65 @@ satelliteImportPromise.then(loaded => {
 // Raycaster for click detection
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
+let currentlyHovered = null;
+let activeSatellite = null;
+
+function onMouseMove(event) {
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+
+  const intersects = raycaster.intersectObjects(satelliteMeshes);
+
+  if (intersects.length > 0) {
+    const closest = intersects[0].object;
+
+    document.body.style.cursor = 'pointer';
+
+    // Only temporarily highlight if it’s not the active one
+    if (closest !== activeSatellite) {
+      if (currentlyHovered && currentlyHovered !== activeSatellite) {
+        currentlyHovered.material.color.set(0xff0000); // reset previous hover
+      }
+
+      currentlyHovered = closest;
+      currentlyHovered.material.color.set(0x00ff00); // temporary hover green
+    }
+
+  } else {
+    document.body.style.cursor = 'default';
+
+    if (currentlyHovered && currentlyHovered !== activeSatellite) {
+      currentlyHovered.material.color.set(0xff0000); // reset hover
+      currentlyHovered = null;
+    }
+  }
+}
+
 
 // Click handler
 function onMouseClick(event) {
-  // Calculate mouse position in normalized device coordinates
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-  
-  // Update raycaster with camera and mouse position
+
   raycaster.setFromCamera(mouse, camera);
-  
-  // Check for intersections with satellites
+
   const intersects = raycaster.intersectObjects(satelliteMeshes);
-  
+
   if (intersects.length > 0) {
     const clickedSatellite = intersects[0].object;
-    showSatelliteInfo(clickedSatellite);
+
+    // Reset previous active satellite's color
+    if (activeSatellite && activeSatellite !== clickedSatellite) {
+      activeSatellite.material.color.set(0xff0000); // back to red
+    }
+
+    // Set new active satellite
+    activeSatellite = clickedSatellite;
+    activeSatellite.material.color.set(0x00ff00); // green
+
+    showSatelliteInfo(activeSatellite);
   }
 }
 
@@ -311,6 +361,8 @@ window.closeSatelliteInfo = function() {
 
 // Add click event listener
 window.addEventListener('click', onMouseClick);
+// Add the mouse move event listener
+window.addEventListener('mousemove', onMouseMove);
 
 // Sun light
 const sunLight = new THREE.DirectionalLight(0xffffff, 2.0);
