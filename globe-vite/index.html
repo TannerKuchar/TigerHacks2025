@@ -8,6 +8,51 @@
   <style>
     body {
       margin: 0;
+      font-family: Arial, sans-serif;
+    }
+    
+    #satelliteInfo {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 20px;
+      border-radius: 10px;
+      max-width: 300px;
+      display: none;
+      z-index: 1000;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    }
+    
+    #satelliteInfo.visible {
+      display: block;
+    }
+    
+    #satelliteInfo h3 {
+      margin-top: 0;
+      color: #ff0000;
+    }
+    
+    #satelliteInfo .close {
+      float: right;
+      cursor: pointer;
+      font-size: 20px;
+      font-weight: bold;
+      color: #ccc;
+    }
+    
+    #satelliteInfo .close:hover {
+      color: white;
+    }
+    
+    #satelliteInfo .info-item {
+      margin: 10px 0;
+    }
+    
+    #satelliteInfo .info-label {
+      font-weight: bold;
+      color: #aaa;
     }
   </style>
   <script type="importmap">
@@ -21,6 +66,11 @@
 </head>
 
 <body>
+  <div id="satelliteInfo">
+    <span class="close" onclick="closeSatelliteInfo()">&times;</span>
+    <h3 id="satelliteName">Satellite Information</h3>
+    <div id="satelliteDetails"></div>
+  </div>
   <script type="module" src="main.js"></script>
 </body>
 
