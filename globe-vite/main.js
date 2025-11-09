@@ -21,7 +21,75 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
 });
 
 async function initializeFavoritesTable() {
-  // This will be handled in Supabase dashboard - see instructions below
+
+}
+
+let showAllOrbits = true;
+let showAllCoverage = true;
+let orbitLines = []; 
+let coverageCircles = []; 
+
+// Add these functions to handle the toggles
+function toggleAllOrbits() {
+  showAllOrbits = !showAllOrbits;
+  
+  // Update all existing orbit lines
+  orbitLines.forEach(orbitLine => {
+    if (orbitLine) {
+      orbitLine.visible = showAllOrbits;
+    }
+  });
+  
+  // Update button text
+  const toggleOrbitsBtn = document.getElementById('toggle-orbits-btn');
+  if (toggleOrbitsBtn) {
+    toggleOrbitsBtn.textContent = showAllOrbits ? 'Hide Orbits' : 'Show Orbits';
+  }
+  
+  // Handle active satellite specifically
+  if (activeSatellite) {
+    if (!showAllOrbits && activeSatellite.userData.orbitLine) {
+      // Remove active satellite's orbit when toggling off
+      scene.remove(activeSatellite.userData.orbitLine);
+      activeSatellite.userData.orbitLine.geometry.dispose();
+      activeSatellite.userData.orbitLine.material.dispose();
+      delete activeSatellite.userData.orbitLine;
+    } else if (showAllOrbits && !activeSatellite.userData.orbitLine) {
+      // Redraw active satellite's orbit when toggling on
+      drawSatelliteOrbit(activeSatellite.userData.index);
+    }
+  }
+}
+
+function toggleAllCoverage() {
+  showAllCoverage = !showAllCoverage;
+  
+  // Update all existing coverage circles
+  coverageCircles.forEach(coverageCircle => {
+    if (coverageCircle) {
+      coverageCircle.visible = showAllCoverage;
+    }
+  });
+  
+  // Update button text
+  const toggleCoverageBtn = document.getElementById('toggle-coverage-btn');
+  if (toggleCoverageBtn) {
+    toggleCoverageBtn.textContent = showAllCoverage ? 'Hide Coverage' : 'Show Coverage';
+  }
+  
+  // Handle active satellite specifically
+  if (activeSatellite) {
+    if (!showAllCoverage && activeSatellite.userData.coverageCircle) {
+      // Remove active satellite's coverage when toggling off
+      scene.remove(activeSatellite.userData.coverageCircle);
+      activeSatellite.userData.coverageCircle.geometry.dispose();
+      activeSatellite.userData.coverageCircle.material.dispose();
+      delete activeSatellite.userData.coverageCircle;
+    } else if (showAllCoverage && !activeSatellite.userData.coverageCircle) {
+      // Redraw active satellite's coverage when toggling on
+      drawCoverageCircle(activeSatellite);
+    }
+  }
 }
 
 // Get user's favorites
@@ -210,6 +278,8 @@ async function initAuth() {
     if (favoritesPanel) favoritesPanel.style.display = 'none';
   }
 }
+
+
 
 // Listen for auth changes
 supabase.auth.onAuthStateChange((event, session) => {
@@ -462,24 +532,30 @@ async function initializeRealSatellites() {
   console.log('initializeRealSatellites called, satellite available:', !!satellite);
   if(!satellite) return;
 
-  // Clear test satellites
+  // Clear test satellites and arrays
   satelliteMeshes.forEach(m=>satelliteGroup.remove(m));
   satelliteMeshes.length=0;
   satelliteTLEs.length=0;
   satelliteInfo.length=0;
+  orbitLines.length=0;
+  coverageCircles.length=0;
 
   const tles = await fetchTLEsBatch();
   console.log('Fetched TLEs:', tles.length);
   if(!tles.length) return;
 
   tles.forEach((tle, idx) => {
-  const mesh = createSatelliteMesh(); // NEW MATERIAL PER SATELLITE
-  mesh.userData = { isTest: false, name: tle.name, index: idx };
-  satelliteGroup.add(mesh);
-  satelliteMeshes.push(mesh);
-  satelliteTLEs.push(tle.satrec);
-  satelliteInfo.push(tle);
-});
+    const mesh = createSatelliteMesh();
+    mesh.userData = { isTest: false, name: tle.name, index: idx };
+    satelliteGroup.add(mesh);
+    satelliteMeshes.push(mesh);
+    satelliteTLEs.push(tle.satrec);
+    satelliteInfo.push(tle);
+    
+    // Initialize empty slots for orbit lines and coverage circles
+    orbitLines[idx] = null;
+    coverageCircles[idx] = null;
+  });
 
   console.log('Created', satelliteMeshes.length, 'satellite meshes');
   console.log('SatelliteGroup children:', satelliteGroup.children.length);
@@ -533,6 +609,13 @@ function drawSatelliteOrbit(idx) {
   const satrec = satelliteTLEs[idx];
   if (!satrec) return;
 
+  // Remove existing orbit line if it exists
+  if (orbitLines[idx]) {
+    scene.remove(orbitLines[idx]);
+    orbitLines[idx].geometry.dispose();
+    orbitLines[idx].material.dispose();
+  }
+
   const points = [];
   const colors = [];
   const now = new Date();
@@ -574,11 +657,14 @@ function drawSatelliteOrbit(idx) {
   });
   
   const orbitLine = new THREE.Line(geometry, material);
+  orbitLine.visible = showAllOrbits; // Respect the global toggle
   scene.add(orbitLine);
 
-  // Store a reference so we can remove it later
+  // Store in both arrays for different access patterns
+  orbitLines[idx] = orbitLine;
   activeSatellite.userData.orbitLine = orbitLine;
 }
+
 
 // ---------- Solar / time helpers ----------
 function toRadians(d){ return d * Math.PI / 180; }
@@ -734,12 +820,20 @@ function onMouseClick(event) {
   if (activeSatellite) {
     activeSatellite.material.color.set(0xff0000); // reset to red
 
-    // Remove the old orbit line
+    // ALWAYS remove the old orbit line (regardless of toggle state)
     if (activeSatellite.userData?.orbitLine) {
       scene.remove(activeSatellite.userData.orbitLine);
       activeSatellite.userData.orbitLine.geometry.dispose();
       activeSatellite.userData.orbitLine.material.dispose();
       delete activeSatellite.userData.orbitLine;
+    }
+
+    // ALWAYS remove the old coverage circle (regardless of toggle state)
+    if (activeSatellite.userData?.coverageCircle) {
+      scene.remove(activeSatellite.userData.coverageCircle);
+      activeSatellite.userData.coverageCircle.geometry.dispose();
+      activeSatellite.userData.coverageCircle.material.dispose();
+      delete activeSatellite.userData.coverageCircle;
     }
   }
 
@@ -750,10 +844,40 @@ function onMouseClick(event) {
   // Show info panel
   showSatelliteInfo(activeSatellite);
 
-  // Draw orbit for the newly clicked satellite
-  drawSatelliteOrbit(activeSatellite.userData.index);
+  // Draw orbit for the newly clicked satellite if orbits are toggled on
+  if (showAllOrbits) {
+    drawSatelliteOrbit(activeSatellite.userData.index);
+  }
+  
+  // Draw coverage circle if coverage is toggled on
+  if (showAllCoverage) {
+    drawCoverageCircle(activeSatellite);
+  }
+
+  // Optional zoom to satellite if enabled
+  if (autoZoomEnabled) {
+    const targetPos = clickedSatellite.position.clone();
+    const distance = 3; // Adjust this for zoom level (lower = closer)
+    const direction = targetPos.clone().normalize();
+    camera.position.copy(direction.multiplyScalar(distance));
+    camera.lookAt(0, 0, 0);
+  }
 }
 
+document.addEventListener('DOMContentLoaded', function() {
+  const toggleOrbitsBtn = document.getElementById('toggle-orbits-btn');
+  const toggleCoverageBtn = document.getElementById('toggle-coverage-btn');
+  
+  if (toggleOrbitsBtn) {
+    toggleOrbitsBtn.addEventListener('click', toggleAllOrbits);
+  }
+  
+  if (toggleCoverageBtn) {
+    toggleCoverageBtn.addEventListener('click', toggleAllCoverage);
+  }
+});
+
+// Show satellite information
 // Show satellite information
 async function showSatelliteInfo(satelliteMesh) {
   const infoPanel = document.getElementById('satelliteInfo');
@@ -779,6 +903,7 @@ async function showSatelliteInfo(satelliteMesh) {
   } else {
     const index = satelliteMesh.userData.index;
     const info = satelliteInfo[index];
+    const satrec = satelliteTLEs[index]; // ADD THIS - needed for pass calculation
     const favorited = await isFavorited(name);
     
     if (info) {
@@ -809,37 +934,23 @@ async function showSatelliteInfo(satelliteMesh) {
             ${favorited ? '★ Unfavorite' : '☆ Favorite'}
           </button>
         </div>
+        <div class="info-item">
+          <button id="next-pass-btn" style="
+            padding: 8px 16px;
+            background: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 5px;
+            width: 100%;
+          ">
+            Next Visible Pass
+          </button>
+        </div>
+        <div id="pass-info" style="margin-top: 10px; font-size: 12px; display: none;"></div>
       `;
-      
-      // Add favorite button handler
-      const favoriteBtn = document.getElementById('favorite-btn');
-      if (favoriteBtn) {
-        favoriteBtn.addEventListener('click', async () => {
-          const { data: { user } } = await supabase.auth.getUser();
-          
-          if (!user) {
-            alert('Please log in to save favorites!');
-            if (loginBtn) loginBtn.click();
-            return;
-          }
-          
-          if (favorited) {
-            const success = await removeFavorite(name);
-            if (success) {
-              favoriteBtn.textContent = '☆ Favorite';
-              favoriteBtn.style.background = '#4CAF50';
-              updateFavoritesList();
-            }
-          } else {
-            const success = await addFavorite(name, index);
-            if (success) {
-              favoriteBtn.textContent = '★ Unfavorite';
-              favoriteBtn.style.background = '#f44336';
-              updateFavoritesList(); 
-            }
-          }
-        });
-      }
     } else {
       html += `
         <div class="info-item">
@@ -851,15 +962,115 @@ async function showSatelliteInfo(satelliteMesh) {
 
   // Always add the download button
   html += `
-    <button id="downloadSatData">Download Data</button>
+    <button id="downloadSatData" style="
+      padding: 8px 16px;
+      background: #9C27B0;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-top: 5px;
+      width: 100%;
+    ">Download Data</button>
   `;
 
   detailsElement.innerHTML = html;
 
-  // Attach click handler
+  const favoriteBtn = document.getElementById('favorite-btn');
+  const nextPassBtn = document.getElementById('next-pass-btn');
+  const passInfoDiv = document.getElementById('pass-info');
+  const downloadBtn = document.getElementById('downloadSatData');
+  const toggleOrbitBtn = document.getElementById('toggle-orbit-btn');
+
+  if (favoriteBtn) {
+    const index = satelliteMesh.userData.index;
+    const favorited = await isFavorited(name);
+    
+    favoriteBtn.addEventListener('click', async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        alert('Please log in to save favorites!');
+        if (loginBtn) loginBtn.click();
+        return;
+      }
+      
+      if (favorited) {
+        const success = await removeFavorite(name);
+        if (success) {
+          favoriteBtn.textContent = '☆ Favorite';
+          favoriteBtn.style.background = '#4CAF50';
+          updateFavoritesList();
+        }
+      } else {
+        const success = await addFavorite(name, index);
+        if (success) {
+          favoriteBtn.textContent = '★ Unfavorite';
+          favoriteBtn.style.background = '#f44336';
+          updateFavoritesList(); 
+        }
+      }
+    });
+  }
+
+  if (nextPassBtn && passInfoDiv && !isTest) {
+    const index = satelliteMesh.userData.index;
+    const satrec = satelliteTLEs[index];
+    
+    nextPassBtn.addEventListener('click', () => {
+      // Toggle visibility
+      if (passInfoDiv.style.display === 'block') {
+        passInfoDiv.style.display = 'none';
+        return;
+      }
+      
+      const passes = calculatePasses(satrec, COLUMBIA_LAT, COLUMBIA_LON, 0, 48);
+      
+      if (passes.length === 0) {
+        passInfoDiv.innerHTML = '<p style="color: #f44336;">No visible passes in next 48 hours</p>';
+        passInfoDiv.style.display = 'block';
+        return;
+      }
+      
+      const nextPass = passes[0];
+      const startTime = nextPass.startTime.toLocaleString();
+      const maxEl = nextPass.maxElevation.toFixed(1);
+      const duration = nextPass.duration.toFixed(1);
+      
+      // Calculate rough direction at max elevation
+      const maxPosVel = satellite.propagate(satrec, nextPass.maxElevationTime);
+      const maxGmst = satellite.gstime(nextPass.maxElevationTime);
+      const maxEcef = satellite.eciToEcf(maxPosVel.position, maxGmst);
+      const maxLook = calculateLookAngles(COLUMBIA_LAT, COLUMBIA_LON, 0, maxEcef.x, maxEcef.y, maxEcef.z, maxGmst);
+      const direction = getDirection(maxLook.azimuth);
+      
+      passInfoDiv.innerHTML = `
+        <div style="background: rgba(255,255,255,0.1); padding: 10px; border-radius: 4px;">
+          <strong>Next Pass:</strong><br>
+          ${startTime}<br>
+          ⏱Duration: ${duration} min<br>
+          Max Elevation: ${maxEl}°<br>
+          Direction: ${direction}<br>
+          ${maxEl > 30 ? 'Good visibility!' : maxEl > 10 ? 'Moderate visibility' : 'Low on horizon'}
+        </div>
+      `;
+      passInfoDiv.style.display = 'block';
+    });
+  }
+
   document.getElementById('downloadSatData').onclick = () => {
     downloadSatelliteData(satelliteMesh);
   };
+
+  if (toggleOrbitBtn && !isTest) {
+    toggleOrbitBtn.addEventListener('click', () => {
+      if (activeSatellite.userData.orbitLine) {
+        activeSatellite.userData.orbitLine.visible = !activeSatellite.userData.orbitLine.visible;
+        toggleOrbitBtn.textContent = activeSatellite.userData.orbitLine.visible ? 'Hide Orbit' : 'Show Orbit';
+      }
+    });
+  }
 
   infoPanel.classList.add('visible');
 }
@@ -896,12 +1107,6 @@ Position Z: ${satelliteMesh.position.z.toFixed(3)}
   URL.revokeObjectURL(url);
 }
 
-
-// Close satellite info panel
-window.closeSatelliteInfo = function() {
-  const infoPanel = document.getElementById('satelliteInfo');
-  infoPanel.classList.remove('visible');
-};
 
 // Add click event listener
 window.addEventListener('click', onMouseClick);
@@ -963,3 +1168,199 @@ window.addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
+
+// ===== PASS PREDICTION & COVERAGE =====
+
+// Calculate satellite passes for observer location
+function calculatePasses(satrec, observerLat, observerLon, observerAlt = 0, hoursAhead = 24) {
+  const passes = [];
+  const now = new Date();
+  const endTime = new Date(now.getTime() + hoursAhead * 60 * 60 * 1000);
+  
+  let inPass = false;
+  let passStart = null;
+  let maxElevation = 0;
+  let maxElevationTime = null;
+  
+  // Check every minute
+  for (let time = now.getTime(); time <= endTime.getTime(); time += 60000) {
+    const date = new Date(time);
+    const posVel = satellite.propagate(satrec, date);
+    if (!posVel?.position) continue;
+    
+    const gmst = satellite.gstime(date);
+    const ecef = satellite.eciToEcf(posVel.position, gmst);
+    
+    // Calculate look angles from observer to satellite
+    const lookAngles = calculateLookAngles(
+      observerLat, observerLon, observerAlt,
+      ecef.x, ecef.y, ecef.z, gmst
+    );
+    
+    const isVisible = lookAngles.elevation > 0; // Above horizon
+    
+    if (isVisible && !inPass) {
+      // Pass starting
+      inPass = true;
+      passStart = date;
+      maxElevation = lookAngles.elevation;
+      maxElevationTime = date;
+    } else if (isVisible && inPass) {
+      // Continue tracking max elevation
+      if (lookAngles.elevation > maxElevation) {
+        maxElevation = lookAngles.elevation;
+        maxElevationTime = date;
+      }
+    } else if (!isVisible && inPass) {
+      // Pass ending
+      inPass = false;
+      passes.push({
+        startTime: passStart,
+        endTime: date,
+        maxElevation: maxElevation,
+        maxElevationTime: maxElevationTime,
+        duration: (date - passStart) / 1000 / 60 // minutes
+      });
+    }
+  }
+  
+  return passes;
+}
+
+// Calculate look angles (azimuth, elevation) from observer to satellite
+function calculateLookAngles(obsLat, obsLon, obsAlt, satX, satY, satZ, gmst) {
+  // Convert observer lat/lon to radians
+  const latRad = obsLat * Math.PI / 180;
+  const lonRad = obsLon * Math.PI / 180;
+  
+  // Observer position in ECEF (km)
+  const earthRadius = 6371;
+  const obsX = (earthRadius + obsAlt / 1000) * Math.cos(latRad) * Math.cos(lonRad);
+  const obsY = (earthRadius + obsAlt / 1000) * Math.cos(latRad) * Math.sin(lonRad);
+  const obsZ = (earthRadius + obsAlt / 1000) * Math.sin(latRad);
+  
+  // Satellite position relative to observer
+  const dx = satX - obsX;
+  const dy = satY - obsY;
+  const dz = satZ - obsZ;
+  
+  // Convert to topocentric coordinates (East, North, Up)
+  const south = Math.sin(latRad) * Math.cos(lonRad) * dx + 
+                Math.sin(latRad) * Math.sin(lonRad) * dy - 
+                Math.cos(latRad) * dz;
+  const east = -Math.sin(lonRad) * dx + Math.cos(lonRad) * dy;
+  const up = Math.cos(latRad) * Math.cos(lonRad) * dx + 
+             Math.cos(latRad) * Math.sin(lonRad) * dy + 
+             Math.sin(latRad) * dz;
+  
+  // Calculate range, azimuth, elevation
+  const range = Math.sqrt(dx * dx + dy * dy + dz * dz);
+  const elevation = Math.asin(up / range) * 180 / Math.PI;
+  let azimuth = Math.atan2(east, -south) * 180 / Math.PI;
+  if (azimuth < 0) azimuth += 360;
+  
+  return { azimuth, elevation, range };
+}
+
+// Check if satellite can see a point on Earth
+function canSatelliteSeePoint(satrec, targetLat, targetLon, date = new Date()) {
+  const posVel = satellite.propagate(satrec, date);
+  if (!posVel?.position) return false;
+  
+  const gmst = satellite.gstime(date);
+  const ecef = satellite.eciToEcf(posVel.position, gmst);
+  
+  // Calculate look angles FROM satellite TO ground point
+  const lookAngles = calculateLookAngles(targetLat, targetLon, 0, ecef.x, ecef.y, ecef.z, gmst);
+  
+  // If elevation from satellite's perspective is positive, it can see the point
+  // Typically satellites can see points within ~2500km radius depending on altitude
+  return lookAngles.elevation < 0 && lookAngles.range < 5000; // Rough approximation
+}
+
+// Get direction name from azimuth
+function getDirection(azimuth) {
+  const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 
+                      'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+  const index = Math.round(azimuth / 22.5) % 16;
+  return directions[index];
+}
+
+// Draw coverage circle on Earth showing where satellite is visible from
+function drawCoverageCircle(satelliteMesh) {
+  const index = satelliteMesh.userData.index;
+  const satrec = satelliteTLEs[index];
+  if (!satrec) return;
+
+  // Remove existing coverage circle if it exists
+  if (coverageCircles[index]) {
+    scene.remove(coverageCircles[index]);
+    coverageCircles[index].geometry.dispose();
+    coverageCircles[index].material.dispose();
+  }
+
+  const date = new Date();
+  const posVel = satellite.propagate(satrec, date);
+  if (!posVel?.position) return;
+
+  const gmst = satellite.gstime(date);
+  const ecef = satellite.eciToEcf(posVel.position, gmst);
+  
+  // Satellite position in km
+  const satPos = new THREE.Vector3(ecef.x, ecef.y, ecef.z);
+  const satAltitude = satPos.length() - 6371; // altitude above Earth surface
+  
+  // Calculate coverage radius based on satellite altitude
+  // Assuming minimum elevation angle of 10 degrees for visibility
+  const earthRadius = 6371;
+  const minElevationRad = 10 * Math.PI / 180;
+  const coverageRadiusKm = earthRadius * Math.acos(
+    earthRadius / (earthRadius + satAltitude) * Math.cos(minElevationRad)
+  );
+  
+  // Convert coverage radius to angle on sphere
+  const coverageAngle = coverageRadiusKm / earthRadius;
+  
+  // Create circle at satellite's sub-point
+  const points = [];
+  const segments = 64;
+  
+  // Normalize satellite position to get sub-satellite point on Earth surface
+  const subSatPoint = satPos.clone().normalize();
+  
+  // Create a circle perpendicular to the sub-satellite point
+  for (let i = 0; i <= segments; i++) {
+    const angle = (i / segments) * Math.PI * 2;
+    
+    // Create a point at coverage radius around sub-satellite point
+    // This is simplified - creates a circle on the sphere
+    const lat = Math.asin(subSatPoint.y);
+    const lon = Math.atan2(subSatPoint.z, subSatPoint.x);
+    
+    const pointLat = lat + coverageAngle * Math.cos(angle);
+    const pointLon = lon + coverageAngle * Math.sin(angle) / Math.cos(lat);
+    
+    // Convert back to 3D coordinates
+    const x = 1.01 * Math.cos(pointLat) * Math.cos(pointLon);
+    const y = 1.01 * Math.sin(pointLat);
+    const z = 1.01 * Math.cos(pointLat) * Math.sin(pointLon);
+    
+    points.push(new THREE.Vector3(x, y, z));
+  }
+  
+  const geometry = new THREE.BufferGeometry().setFromPoints(points);
+  const material = new THREE.LineBasicMaterial({ 
+    color: 0x00ffff,
+    linewidth: 2,
+    transparent: true,
+    opacity: 0.6
+  });
+  
+  const coverageCircle = new THREE.Line(geometry, material);
+  coverageCircle.visible = showAllCoverage; // Respect the global toggle
+  scene.add(coverageCircle);
+  
+  // Store in both arrays for different access patterns
+  coverageCircles[index] = coverageCircle;
+  satelliteMesh.userData.coverageCircle = coverageCircle;
+}
