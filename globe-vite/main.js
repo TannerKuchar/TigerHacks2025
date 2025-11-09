@@ -335,7 +335,7 @@ scene.add(stars);
 
 async function fetchTLEsBatch() {
   try {
-    const response = await fetch("/active.json"); // local file in public folder
+    const response = await fetch("/active_with_country.json"); // local file in public folder
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     
     const jsonData = await response.json();
@@ -358,7 +358,7 @@ async function fetchTLEsBatch() {
       }
     }
 
-    console.log(`Loaded ${tles.length} satellites from active.json`);
+    console.log(`Loaded ${tles.length} satellites from active_with_country.json`);
     return tles;
   } catch (e) {
     console.error("TLE JSON load error:", e);
@@ -406,12 +406,31 @@ const searchEl = document.getElementById("satSearch");
 
 if (searchEl) {
   searchEl.addEventListener("input", () => {
-    const q = searchEl.value.toLowerCase();
-    satelliteMeshes.forEach((mesh, i) => {
-      const name = satelliteInfo[i]?.name?.toLowerCase() || "";
-      mesh.visible = q === "" || name.includes(q);
-    });
+  const q = searchEl.value.toLowerCase();
+
+  // If a satellite is active but search hides it, remove orbit
+  if (activeSatellite) {
+    const name = activeSatellite.userData.name.toLowerCase();
+    if (!name.includes(q)) {
+      if (activeSatellite.userData.orbitLine) {
+        scene.remove(activeSatellite.userData.orbitLine);
+        activeSatellite.userData.orbitLine.geometry.dispose();
+        activeSatellite.userData.orbitLine.material.dispose();
+        delete activeSatellite.userData.orbitLine;
+      }
+      activeSatellite.material.color.set(0xff0000);
+      activeSatellite = null;
+    }
+  }
+
+  satelliteMeshes.forEach((mesh, i) => {
+    const name = satelliteInfo[i]?.name?.toLowerCase() || "";
+    mesh.visible = q === "" || name.includes(q);
   });
+
+  const infoPanel = document.getElementById('satelliteInfo');
+  if (infoPanel) infoPanel.classList.remove('visible');
+});
 }
 
 // Helper function to create a new satellite mesh with its own material
@@ -673,34 +692,41 @@ function onMouseClick(event) {
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
   raycaster.setFromCamera(mouse, camera);
-
   const intersects = raycaster.intersectObjects(satelliteMeshes);
 
-  if (intersects.length > 0) {
-    const clickedSatellite = intersects[0].object;
-
-    // Reset previous active satellite's color
-    if (activeSatellite && activeSatellite !== clickedSatellite) {
-      activeSatellite.material.color.set(0xff0000); // back to red
-
-      // Remove the previous satellite's orbit line if it exists
-      if (activeSatellite.userData.orbitLine) {
-        scene.remove(activeSatellite.userData.orbitLine);
-        activeSatellite.userData.orbitLine.geometry.dispose();
-        activeSatellite.userData.orbitLine.material.dispose();
-        delete activeSatellite.userData.orbitLine;
-      }
-    }
-
-    // Set new active satellite
-    activeSatellite = clickedSatellite;
-    activeSatellite.material.color.set(0x00ff00); // green
-
-    showSatelliteInfo(activeSatellite);
-
-    // Draw orbit for the clicked satellite
-    drawSatelliteOrbit(activeSatellite.userData.index);
+  if (intersects.length === 0) {
+    return; // no satellite clicked
   }
+
+  const clickedSatellite = intersects[0].object;
+
+  // If the same satellite is clicked again, do nothing
+  if (activeSatellite === clickedSatellite) {
+    return;
+  }
+
+  // If a different satellite was active before, reset it
+  if (activeSatellite) {
+    activeSatellite.material.color.set(0xff0000); // reset to red
+
+    // Remove the old orbit line
+    if (activeSatellite.userData?.orbitLine) {
+      scene.remove(activeSatellite.userData.orbitLine);
+      activeSatellite.userData.orbitLine.geometry.dispose();
+      activeSatellite.userData.orbitLine.material.dispose();
+      delete activeSatellite.userData.orbitLine;
+    }
+  }
+
+  // Set new active satellite
+  activeSatellite = clickedSatellite;
+  activeSatellite.material.color.set(0x00ff00); // highlight green
+
+  // Show info panel
+  showSatelliteInfo(activeSatellite);
+
+  // Draw orbit for the newly clicked satellite
+  drawSatelliteOrbit(activeSatellite.userData.index);
 }
 
 // Show satellite information
@@ -708,14 +734,16 @@ async function showSatelliteInfo(satelliteMesh) {
   const infoPanel = document.getElementById('satelliteInfo');
   const nameElement = document.getElementById('satelliteName');
   const detailsElement = document.getElementById('satelliteDetails');
-  
+
   const name = satelliteMesh.userData.name || 'Unknown Satellite';
   const isTest = satelliteMesh.userData.isTest;
-  
+
   nameElement.textContent = name;
-  
+
+  let html = '';
+
   if (isTest) {
-    detailsElement.innerHTML = `
+    html += `
       <div class="info-item">
         <span class="info-label">Type:</span> Test
       </div>
@@ -729,7 +757,7 @@ async function showSatelliteInfo(satelliteMesh) {
     const favorited = await isFavorited(name);
     
     if (info) {
-      detailsElement.innerHTML = `
+      html += `
         <div class="info-item">
           <span class="info-label">Name:</span> ${info.name}
         </div>
@@ -788,16 +816,61 @@ async function showSatelliteInfo(satelliteMesh) {
         });
       }
     } else {
-      detailsElement.innerHTML = `
+      html += `
         <div class="info-item">
           <span class="info-label">Type:</span> Real Satellite
         </div>
       `;
     }
   }
-  
+
+  // Always add the download button
+  html += `
+    <button id="downloadSatData">Download Data</button>
+  `;
+
+  detailsElement.innerHTML = html;
+
+  // Attach click handler
+  document.getElementById('downloadSatData').onclick = () => {
+    downloadSatelliteData(satelliteMesh);
+  };
+
   infoPanel.classList.add('visible');
 }
+
+// Download satellite data
+function downloadSatelliteData(satelliteMesh) {
+  const index = satelliteMesh.userData.index;
+  const info = satelliteInfo[index];
+
+  if (!info) return;
+
+  // Prepare CSV or JSON string
+  const dataStr = `
+Name: ${info.name}
+TLE Line 1: ${info.line1}
+TLE Line 2: ${info.line2}
+Position X: ${satelliteMesh.position.x.toFixed(3)}
+Position Y: ${satelliteMesh.position.y.toFixed(3)}
+Position Z: ${satelliteMesh.position.z.toFixed(3)}
+`;
+
+  // Create a Blob and link
+  const blob = new Blob([dataStr], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${info.name.replace(/\s+/g,'_')}_data.txt`; // filename
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+
+  // Release the object URL
+  URL.revokeObjectURL(url);
+}
+
 
 // Close satellite info panel
 window.closeSatelliteInfo = function() {
