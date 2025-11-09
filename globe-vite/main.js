@@ -13,24 +13,202 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+async function initializeFavoritesTable() {
+  // This will be handled in Supabase dashboard - see instructions below
+}
+
+// Get user's favorites
+async function getUserFavorites() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  
+  const { data, error } = await supabase
+    .from('favorites')
+    .select('satellite_name, satellite_index')
+    .eq('user_id', user.id);
+  
+  if (error) {
+    console.error('Error fetching favorites:', error);
+    return [];
+  }
+  return data || [];
+}
+
+// Add satellite to favorites
+async function addFavorite(satelliteName, satelliteIndex) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    alert('Please log in to save favorites!');
+    return false;
+  }
+  
+  const { error } = await supabase
+    .from('favorites')
+    .insert({
+      user_id: user.id,
+      satellite_name: satelliteName,
+      satellite_index: satelliteIndex
+    });
+  
+  if (error) {
+    console.error('Error adding favorite:', error);
+    alert('Failed to add favorite');
+    return false;
+  }
+  
+  return true;
+}
+
+// Remove satellite from favorites
+async function removeFavorite(satelliteName) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+  
+  const { error } = await supabase
+    .from('favorites')
+    .delete()
+    .eq('user_id', user.id)
+    .eq('satellite_name', satelliteName);
+  
+  if (error) {
+    console.error('Error removing favorite:', error);
+    return false;
+  }
+  
+  return true;
+}
+
+// Check if satellite is favorited
+async function isFavorited(satelliteName) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+  
+  const { data, error } = await supabase
+    .from('favorites')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('satellite_name', satelliteName)
+    .maybeSingle();
+  
+  return !error && data;
+}
+
 const loginBtn = document.getElementById("login-btn");
 const logoutBtn = document.getElementById("logout-btn");
 const userName = document.getElementById("user-name");
+
+async function updateFavoritesList() {
+  const favoritesPanel = document.getElementById('favorites-panel');
+  const favoritesList = document.getElementById('favorites-list');
+  const noFavorites = document.getElementById('no-favorites');
+  
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    if (favoritesPanel) favoritesPanel.style.display = 'none';
+    return;
+  }
+  
+  const favorites = await getUserFavorites();
+  
+  if (favorites.length === 0) {
+    if (noFavorites) noFavorites.style.display = 'block';
+    if (favoritesList) favoritesList.innerHTML = '';
+    if (favoritesPanel) favoritesPanel.style.display = 'block';
+    return;
+  }
+  
+  if (noFavorites) noFavorites.style.display = 'none';
+  if (favoritesPanel) favoritesPanel.style.display = 'block';
+  
+  if (favoritesList) {
+    favoritesList.innerHTML = favorites.map((fav, idx) => `
+      <div style="
+        padding: 8px;
+        margin: 5px 0;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 13px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      " data-satellite-index="${fav.satellite_index}">
+        <span class="fav-item-name">${fav.satellite_name}</span>
+        <button class="remove-fav" data-name="${fav.satellite_name}" style="
+          background: #f44336;
+          border: none;
+          color: white;
+          padding: 2px 6px;
+          border-radius: 3px;
+          cursor: pointer;
+          font-size: 11px;
+        ">×</button>
+      </div>
+    `).join('');
+    
+    // Add click handlers for favorites
+    favoritesList.querySelectorAll('.fav-item-name').forEach(item => {
+      item.parentElement.addEventListener('click', (e) => {
+        if (e.target.classList.contains('remove-fav')) return;
+        const index = parseInt(item.parentElement.dataset.satelliteIndex);
+        const mesh = satelliteMeshes[index];
+        if (mesh) {
+          // Focus on satellite
+          if (activeSatellite && activeSatellite !== mesh) {
+            activeSatellite.material.color.set(0xff0000);
+            if (activeSatellite.userData.orbitLine) {
+              scene.remove(activeSatellite.userData.orbitLine);
+              activeSatellite.userData.orbitLine.geometry.dispose();
+              activeSatellite.userData.orbitLine.material.dispose();
+              delete activeSatellite.userData.orbitLine;
+            }
+          }
+          activeSatellite = mesh;
+          activeSatellite.material.color.set(0x00ff00);
+          showSatelliteInfo(mesh);
+          drawSatelliteOrbit(index);
+        }
+      });
+    });
+    
+    // Add remove handlers
+    favoritesList.querySelectorAll('.remove-fav').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const name = btn.dataset.name;
+        const success = await removeFavorite(name);
+        if (success) {
+          updateFavoritesList();
+        }
+      });
+    });
+  }
+}
 
 // Check auth state on load
 async function initAuth() {
   const { data: { user } } = await supabase.auth.getUser();
   
   if (user) {
-    loginBtn.style.display = "none";
-    logoutBtn.style.display = "inline-block";
-    userName.textContent = user.email;
+    if (loginBtn) loginBtn.style.display = "none";
+    if (logoutBtn) logoutBtn.style.display = "inline-block";
+    if (userName) userName.textContent = user.email;
+    updateFavoritesList(); // Add this line
   } else {
-    loginBtn.style.display = "inline-block";
-    logoutBtn.style.display = "none";
-    userName.textContent = "";
+    if (loginBtn) loginBtn.style.display = "inline-block";
+    if (logoutBtn) logoutBtn.style.display = "none";
+    if (userName) userName.textContent = "";
+    const favoritesPanel = document.getElementById('favorites-panel');
+    if (favoritesPanel) favoritesPanel.style.display = 'none';
   }
 }
+
+// Listen for auth changes
+supabase.auth.onAuthStateChange((event, session) => {
+  console.log('Auth state changed:', event);
+  initAuth();
+});
 
 loginBtn.addEventListener("click", async () => {
   const email = prompt("Enter your email:");
@@ -64,6 +242,8 @@ supabase.auth.onAuthStateChange((event, session) => {
 });
 
 initAuth();
+
+
 
 // earth rotation constants
 const SIDEREAL_DAY_S = 86164.0905
@@ -524,7 +704,7 @@ function onMouseClick(event) {
 }
 
 // Show satellite information
-function showSatelliteInfo(satelliteMesh) {
+async function showSatelliteInfo(satelliteMesh) {
   const infoPanel = document.getElementById('satelliteInfo');
   const nameElement = document.getElementById('satelliteName');
   const detailsElement = document.getElementById('satelliteDetails');
@@ -546,6 +726,8 @@ function showSatelliteInfo(satelliteMesh) {
   } else {
     const index = satelliteMesh.userData.index;
     const info = satelliteInfo[index];
+    const favorited = await isFavorited(name);
+    
     if (info) {
       detailsElement.innerHTML = `
         <div class="info-item">
@@ -560,7 +742,51 @@ function showSatelliteInfo(satelliteMesh) {
           Y: ${satelliteMesh.position.y.toFixed(3)}, 
           Z: ${satelliteMesh.position.z.toFixed(3)}
         </div>
+        <div class="info-item">
+          <button id="favorite-btn" style="
+            padding: 8px 16px;
+            background: ${favorited ? '#f44336' : '#4CAF50'};
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 10px;
+          ">
+            ${favorited ? '★ Unfavorite' : '☆ Favorite'}
+          </button>
+        </div>
       `;
+      
+      // Add favorite button handler
+      const favoriteBtn = document.getElementById('favorite-btn');
+      if (favoriteBtn) {
+        favoriteBtn.addEventListener('click', async () => {
+          const { data: { user } } = await supabase.auth.getUser();
+          
+          if (!user) {
+            alert('Please log in to save favorites!');
+            if (loginBtn) loginBtn.click();
+            return;
+          }
+          
+          if (favorited) {
+            const success = await removeFavorite(name);
+            if (success) {
+              favoriteBtn.textContent = '☆ Favorite';
+              favoriteBtn.style.background = '#4CAF50';
+              updateFavoritesList();
+            }
+          } else {
+            const success = await addFavorite(name, index);
+            if (success) {
+              favoriteBtn.textContent = '★ Unfavorite';
+              favoriteBtn.style.background = '#f44336';
+              updateFavoritesList(); 
+            }
+          }
+        });
+      }
     } else {
       detailsElement.innerHTML = `
         <div class="info-item">
