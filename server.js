@@ -1,8 +1,11 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 dotenv.config();
+console.log('API_KEY:', process.env.API_KEY);
 
 const app = express();
 const PORT = 3000;
@@ -12,6 +15,9 @@ app.use(express.json());
 
 const API_KEY = process.env.API_KEY;
 const BASE_URL = "https://api.n2yo.com/rest/v1/satellite";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Cache for TLE data
 let tleCache = null;
@@ -121,6 +127,12 @@ app.get('/tle', async (req, res) => {
 // Prefetch TLEs on startup
 fetchAndCacheTLEs().catch(err => {
     console.error('Failed to prefetch TLEs:', err);
+});
+
+app.use(express.static(path.join(__dirname, 'globe-vite/dist')));
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'globe-vite/dist/index.html'));
 });
 
 app.listen(PORT, () => {
