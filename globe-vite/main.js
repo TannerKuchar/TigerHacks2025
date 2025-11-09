@@ -2,6 +2,69 @@ import * as THREE from "three";
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import getStarfield from "./src/getStarfield.js";
 import { getFresnelMat } from "./src/getFresnelMat.js";
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error('Missing Supabase credentials')
+}
+
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+const loginBtn = document.getElementById("login-btn");
+const logoutBtn = document.getElementById("logout-btn");
+const userName = document.getElementById("user-name");
+
+// Check auth state on load
+async function initAuth() {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (user) {
+    loginBtn.style.display = "none";
+    logoutBtn.style.display = "inline-block";
+    userName.textContent = user.email;
+  } else {
+    loginBtn.style.display = "inline-block";
+    logoutBtn.style.display = "none";
+    userName.textContent = "";
+  }
+}
+
+loginBtn.addEventListener("click", async () => {
+  const email = prompt("Enter your email:");
+  if (!email) return;
+  
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: {
+      emailRedirectTo: window.location.origin
+    }
+  });
+  
+  if (error) {
+    alert("Error: " + error.message);
+  } else {
+    alert("Check your email for the login link!");
+  }
+});
+
+// Logout
+logoutBtn.addEventListener("click", async () => {
+  const { error } = await supabase.auth.signOut();
+  if (error) console.error("Logout error:", error);
+  location.reload();
+});
+
+// Listen for auth changes
+supabase.auth.onAuthStateChange((event, session) => {
+  console.log('Auth state changed:', event);
+  initAuth();
+});
+
+initAuth();
+
 // earth rotation constants
 const SIDEREAL_DAY_S = 86164.0905
 const ANGULAR_SPEED_RAD_S = 2 * Math.PI / SIDEREAL_DAY_S
@@ -152,7 +215,6 @@ function ecefToGlobeCoords(ecef, earthRadius = 1) {
   };
 }
 
-// Create satellite group and meshes
 // Create satellite group and meshes
 const satelliteGroup = new THREE.Group();
 scene.add(satelliteGroup); // CRITICAL: Add to scene
