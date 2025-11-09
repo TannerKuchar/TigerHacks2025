@@ -492,9 +492,11 @@ if (searchEl) {
     if (!name.includes(q)) {
       if (activeSatellite.userData.orbitLine) {
         scene.remove(activeSatellite.userData.orbitLine);
+        scene.remove(activeSatellite.userData.coverageCircle);
         activeSatellite.userData.orbitLine.geometry.dispose();
         activeSatellite.userData.orbitLine.material.dispose();
         delete activeSatellite.userData.orbitLine;
+        delete activeSatellite.userData.coverageCircle;
       }
 
       if (activeSatellite.userData.coverageCircle) {
