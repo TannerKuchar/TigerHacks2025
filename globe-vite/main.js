@@ -161,6 +161,17 @@ const satelliteGeometry = new THREE.SphereGeometry(0.03, 8, 8);
 const satelliteMeshes = [];
 const satelliteTLEs = [];
 const satelliteInfo = []; // Store satellite information
+const searchEl = document.getElementById("satSearch");
+
+if (searchEl) {
+  searchEl.addEventListener("input", () => {
+    const q = searchEl.value.toLowerCase();
+    satelliteMeshes.forEach((mesh, i) => {
+      const name = satelliteInfo[i]?.name?.toLowerCase() || "";
+      mesh.visible = q === "" || name.includes(q);
+    });
+  });
+}
 
 // Helper function to create a new satellite mesh with its own material
 function createSatelliteMesh() {
