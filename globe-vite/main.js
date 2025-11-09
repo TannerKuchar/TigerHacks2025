@@ -446,6 +446,9 @@ function onMouseMove(event) {
 
 // Click handler
 function onMouseClick(event) {
+  // Close info panel
+  window.closeSatelliteInfo();
+
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
@@ -453,21 +456,20 @@ function onMouseClick(event) {
 
   const intersects = raycaster.intersectObjects(satelliteMeshes);
 
+  // Always remove the current orbit line if it exists
+  if (activeSatellite?.userData?.orbitLine) {
+    scene.remove(activeSatellite.userData.orbitLine);
+    activeSatellite.userData.orbitLine.geometry.dispose();
+    activeSatellite.userData.orbitLine.material.dispose();
+    delete activeSatellite.userData.orbitLine;
+  }
+
+  if (activeSatellite) {
+      activeSatellite.material.color.set(0xff0000); // back to red
+    }
+  
   if (intersects.length > 0) {
     const clickedSatellite = intersects[0].object;
-
-    // Reset previous active satellite's color
-    if (activeSatellite && activeSatellite !== clickedSatellite) {
-      activeSatellite.material.color.set(0xff0000); // back to red
-
-      // Remove the previous satellite's orbit line if it exists
-      if (activeSatellite.userData.orbitLine) {
-        scene.remove(activeSatellite.userData.orbitLine);
-        activeSatellite.userData.orbitLine.geometry.dispose();
-        activeSatellite.userData.orbitLine.material.dispose();
-        delete activeSatellite.userData.orbitLine;
-      }
-    }
 
     // Set new active satellite
     activeSatellite = clickedSatellite;
