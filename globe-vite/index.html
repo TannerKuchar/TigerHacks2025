@@ -107,6 +107,25 @@
     <span id="user-name"></span>
   </div>
 
+<div id="favorites-panel" style="
+  position: absolute;
+  top: 60px;
+  right: 10px;
+  z-index: 999;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 12px;
+  border-radius: 8px;
+  max-width: 250px;
+  max-height: 400px;
+  overflow-y: auto;
+  display: none;
+">
+  <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #4CAF50;">★ Favorites</h3>
+  <div id="favorites-list"></div>
+  <p id="no-favorites" style="color: #aaa; font-size: 12px; margin: 5px 0;">No favorites yet</p>
+  </div>
+
   <input id="satSearch"
          placeholder="Search satellites…"
          style="position:absolute;
