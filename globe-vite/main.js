@@ -199,50 +199,40 @@ async function initializeRealSatellites() {
   updateSatellitePositions(); // initial placement
 }
 
-// Set satellite positions once (no live updates)
-let lastUpdateTime=0;
-function updateSatellitePositions(){
-  if(!satellite || !satelliteTLEs.length) {
-    console.log('updateSatellitePositions: no satellite or TLEs');
-    return;
-  }
+let lastUpdateTime = 0;
+function updateSatellitePositions() {
+  if (!satellite || !satelliteTLEs.length) return;
+
   const now = Date.now();
-  if(now-lastUpdateTime<2000) return; // throttle updates every 2s
-  lastUpdateTime=now;
+  const delta = now - lastUpdateTime;
+  lastUpdateTime = now;
 
+  // Remove the throttle — we’ll update every frame
   const date = new Date();
-  const jday = satellite.jday(date.getUTCFullYear(),date.getUTCMonth()+1,date.getUTCDate(),date.getUTCHours(),date.getUTCMinutes(),date.getUTCSeconds());
 
-  let positioned = 0;
-  satelliteMeshes.forEach((mesh,idx)=>{
-    if(mesh.userData.isTest) return;
+  // Use GMST directly from the current time
+  const gmst = satellite.gstime(date);
+
+  satelliteMeshes.forEach((mesh, idx) => {
+    if (mesh.userData.isTest) return;
     const satrec = satelliteTLEs[idx];
-    if(!satrec) {
-      console.log('No satrec for idx', idx);
-      return;
-    }
-    const posVel = satellite.propagate(satrec,date); // USE DATE OBJECT, NOT JDAY
-    if(!posVel?.position) {
-      console.log('No position for idx', idx, posVel);
-      return;
-    }
-    console.log('Position for', idx, ':', posVel.position);
+    if (!satrec) return;
+
+    const posVel = satellite.propagate(satrec, date);
+    if (!posVel?.position) return;
+
     let ecef;
-    try{ 
-      ecef=satellite.eciToEcf(posVel.position,satellite.gstime(jday)); 
-      console.log('ECEF for', idx, ':', ecef);
-    }catch(e){ 
-      console.log('eciToEcf failed:', e);
-      ecef=posVel.position; 
+    try {
+      ecef = satellite.eciToEcf(posVel.position, gmst);
+    } catch {
+      ecef = posVel.position;
     }
+
     const coords = ecefToGlobeCoords(ecef);
-    console.log('Coords for', idx, ':', coords);
-    if(isFinite(coords.x)&&isFinite(coords.y)&&isFinite(coords.z)) {
-      mesh.position.set(coords.x,coords.y,coords.z);
-      positioned++;
+    if (isFinite(coords.x) && isFinite(coords.y) && isFinite(coords.z)) {
+      mesh.position.set(coords.x, coords.y, coords.z);
     }
   });
-  console.log('Positioned', positioned, 'satellites');
 }
 
 // Initialize satellites after satellite.js loads
@@ -251,6 +241,39 @@ satelliteImportPromise.then(loaded => {
     initializeRealSatellites();
   }
 });
+
+function drawSatelliteOrbit(idx) {
+  const satrec = satelliteTLEs[idx];
+  if (!satrec) return;
+
+  const points = [];
+  const now = new Date();
+  const earthRadiusKm = 6371;
+  const scale = 1 / earthRadiusKm; // since your globe radius is 1
+
+  // Sample 1440 points along the orbit, 1 minute apart
+  // Equivalent to one day / 24 hrs
+  for (let i = 0; i <= 1440; i++) {
+    const futureDate = new Date(now.getTime() + i * 60 * 1000);
+    const pv = satellite.propagate(satrec, futureDate);
+    if (!pv?.position) continue;
+
+    const ecef = satellite.eciToEcf(pv.position, satellite.gstime(futureDate));
+    points.push(new THREE.Vector3(
+      ecef.x * scale,
+      ecef.y * scale,
+      ecef.z * scale
+    ));
+  }
+
+  const geometry = new THREE.BufferGeometry().setFromPoints(points);
+  const material = new THREE.LineBasicMaterial({ color: 0x00ff00 });
+  const orbitLine = new THREE.Line(geometry, material);
+  scene.add(orbitLine);
+
+  // Store a reference so we can remove it later
+  activeSatellite.userData.orbitLine = orbitLine;
+}
 
 
 // Raycaster for click detection
@@ -308,6 +331,14 @@ function onMouseClick(event) {
     // Reset previous active satellite's color
     if (activeSatellite && activeSatellite !== clickedSatellite) {
       activeSatellite.material.color.set(0xff0000); // back to red
+
+      // Remove the previous satellite's orbit line if it exists
+      if (activeSatellite.userData.orbitLine) {
+        scene.remove(activeSatellite.userData.orbitLine);
+        activeSatellite.userData.orbitLine.geometry.dispose();
+        activeSatellite.userData.orbitLine.material.dispose();
+        delete activeSatellite.userData.orbitLine;
+      }
     }
 
     // Set new active satellite
@@ -315,6 +346,9 @@ function onMouseClick(event) {
     activeSatellite.material.color.set(0x00ff00); // green
 
     showSatelliteInfo(activeSatellite);
+
+    // Draw orbit for the clicked satellite
+    drawSatelliteOrbit(activeSatellite.userData.index);
   }
 }
 
@@ -395,7 +429,6 @@ function animate() {
   stars.rotation.y -= 0.0002;
   
   updateSatellitePositions(); // ADD THIS LINE
-
   renderer.render(scene, camera);
 }
 
