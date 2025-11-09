@@ -2,6 +2,9 @@ import * as THREE from "three";
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import getStarfield from "./src/getStarfield.js";
 import { getFresnelMat } from "./src/getFresnelMat.js";
+// earth rotation constants
+const SIDEREAL_DAY_S = 86164.0905
+const ANGULAR_SPEED_RAD_S = 2 * Math.PI / SIDEREAL_DAY_S
 
 let satellite = null;
 const satelliteImportPromise = (async () => {
@@ -49,8 +52,13 @@ const material = new THREE.MeshPhongMaterial({
   bumpMap: loader.load("/textures/01_earthbump1k.jpg"),
   bumpScale: 0.04,
 });
+// choose a reference moment
+const epoch = Date.now() / 1000 //seconds
+const initialAngle = 0          //optional if you need a starting offset
+
+// --- SCENE SETUP / GEOMETRY ---
 const earthMesh = new THREE.Mesh(geometry, material);
-earthGroup.add(earthMesh);
+earthGroup.add(earthMesh)  // relates child to group
 
 // Lights overlay
 const lightsMat = new THREE.MeshBasicMaterial({
@@ -152,6 +160,17 @@ const satelliteGeometry = new THREE.SphereGeometry(0.03, 8, 8);
 const satelliteMeshes = [];
 const satelliteTLEs = [];
 const satelliteInfo = []; // Store satellite information
+const searchEl = document.getElementById("satSearch");
+
+if (searchEl) {
+  searchEl.addEventListener("input", () => {
+    const q = searchEl.value.toLowerCase();
+    satelliteMeshes.forEach((mesh, i) => {
+      const name = satelliteInfo[i]?.name?.toLowerCase() || "";
+      mesh.visible = q === "" || name.includes(q);
+    });
+  });
+}
 
 // Helper function to create a new satellite mesh with its own material
 function createSatelliteMesh() {
@@ -275,6 +294,96 @@ function drawSatelliteOrbit(idx) {
   activeSatellite.userData.orbitLine = orbitLine;
 }
 
+// ---------- Solar / time helpers ----------
+function toRadians(d){ return d * Math.PI / 180; }
+function toDegrees(r){ return r * 180 / Math.PI; }
+
+function julianDay(date) {
+  // date: JS Date in UTC
+  return date.getTime() / 86400000 + 2440587.5;
+}
+
+// Returns { lat: degrees, lon: degrees } for sub-solar point at `date` (UTC)
+function subSolarLatLon(date) {
+  const JD = julianDay(date);
+  const n = JD - 2451545.0;                       // days since J2000.0
+  const T = n / 36525.0;                          // centuries since J2000.0
+
+  // Mean longitude of the Sun (deg)
+  let L = (280.460 + 36000.770 * T + 0.98564736 * n) % 360;
+  if (L < 0) L += 360;
+
+  // Mean anomaly (deg)
+  const g = (357.528 + 35999.050 * T + 0.98560028 * n) % 360;
+  const gRad = toRadians(g);
+
+  // Ecliptic longitude (deg) - approximate (includes small periodic terms)
+  const lambda = L + 1.915 * Math.sin(gRad) + 0.020 * Math.sin(2 * gRad);
+  const lambdaRad = toRadians(lambda);
+
+  // Obliquity of the ecliptic (deg)
+  const epsilon = 23.439291 - 0.0130042 * T;
+  const epsRad = toRadians(epsilon);
+
+  // Sun's right ascension (deg) and declination (deg)
+  const sinLambda = Math.sin(lambdaRad);
+  const cosLambda = Math.cos(lambdaRad);
+  const sinEps = Math.sin(epsRad);
+  const cosEps = Math.cos(epsRad);
+
+  const declRad = Math.asin(sinEps * sinLambda);
+  const decl = toDegrees(declRad); // sub-solar latitude
+
+  // RA in radians (use atan2 to get full circle)
+  const raRad = Math.atan2(cosEps * sinLambda, cosLambda);
+  let raDeg = toDegrees(raRad);
+  if (raDeg < 0) raDeg += 360;
+
+  // Greenwich Mean Sidereal Time (deg)
+  // More accurate GMST formula:
+  const JD0 = Math.floor(JD - 0.5) + 0.5;
+  const H = (JD - JD0) * 24;                 // UT hours past previous midnight
+  const D = JD - 2451545.0;
+  const D0 = JD0 - 2451545.0;
+  const T0 = D0 / 36525.0;
+  let GMST = 280.46061837 + 360.98564736629 * (JD - 2451545.0)
+             + 0.000387933 * T * T - (T * T * T) / 38710000;
+  GMST = ((GMST % 360) + 360) % 360; // normalize 0..360
+
+  // Greenwich Hour Angle (deg) = GMST - RA
+  let GHA = GMST - raDeg;
+  // normalize to -180..180
+  GHA = ((GHA + 180) % 360) - 180;
+
+  // subsolar longitude = -GHA (if GHA is degrees west of Greenwich)
+  let subLon = -GHA;
+  if (subLon > 180) subLon -= 360;
+  if (subLon < -180) subLon += 360;
+
+  return { lat: decl, lon: subLon };
+}
+
+// convert lat/lon (deg) on sphere radius r -> THREE.Vector3
+function latLonToVector3(latDeg, lonDeg, r = 1) {
+ const lat = toRadians(latDeg);
+  const lon = toRadians(lonDeg);
+  // spherical to cartesian: assume lat = +N, lon measured +E from Greenwich
+  const x = r * Math.cos(lat) * Math.cos(lon);
+  const z = r * Math.cos(lat) * Math.sin(lon);
+  const y = r * Math.sin(lat);
+  return new THREE.Vector3(x, y, z);
+}
+
+// ---------- Marker for Columbia ----------
+const columbiaMarker = new THREE.Mesh(
+  new THREE.SphereGeometry(0.02, 8, 8),
+  new THREE.MeshStandardMaterial({ color: 0xffff00 })
+);
+scene.add(columbiaMarker);
+
+// Columbia coords
+const COLUMBIA_LAT = 38.9517;   // degrees
+const COLUMBIA_LON = -92.3341;  // degrees (negative = west)
 
 // Raycaster for click detection
 const raycaster = new THREE.Raycaster();
@@ -422,13 +531,41 @@ scene.add(sunLight);
 function animate() {
   requestAnimationFrame(animate);
 
-  earthMesh.rotation.y += 0.0005;
-  lightsMesh.rotation.y += 0.0005;
-  cloudsMesh.rotation.y += 0.0006;
-  glowMesh.rotation.y += 0.0005;
-  stars.rotation.y -= 0.0002;
-  
-  updateSatellitePositions(); // ADD THIS LINE
+  const now = Date.now() / 1000;
+  const t = now - epoch;
+  const rotationAngle = initialAngle + ANGULAR_SPEED_RAD_S * t;
+
+  earthMesh.rotation.y  = rotationAngle;
+  lightsMesh.rotation.y = rotationAngle;
+  cloudsMesh.rotation.y = rotationAngle * 1.0001;
+  glowMesh.rotation.y   = rotationAngle;
+
+  // ---- compute sun/sub-solar and position the light ----
+  const date = new Date(); // current UTC
+  const sub = subSolarLatLon(date); // {lat, lon} in degrees
+
+  // Place sun directional light at sub-solar point direction
+  const sunPos = latLonToVector3(sub.lat, sub.lon, 10); // push out along direction
+  sunLight.position.copy(sunPos); // directional light uses position -> direction to origin
+
+  // Put the Columbia marker on the globe surface
+  const colVec = latLonToVector3(COLUMBIA_LAT, COLUMBIA_LON, 1.01); // slightly above surface
+  columbiaMarker.position.copy(colVec);
+
+  // Simple daylight check: dot(sunDir, columbiaVec) > 0 -> sun above horizon
+  const sunDir = sunPos.clone().normalize().negate(); // direction from Earth toward Sun
+  const colNorm = colVec.clone().normalize();
+  const dot = sunDir.dot(colNorm);
+  const columbiaInDaylight = dot > 0;
+
+  // Optionally: change the marker color based on day/night
+  columbiaMarker.material.color.set(columbiaInDaylight ? 0x00ff00 : 0xff0000);
+
+  // optional logging for verification (throttled visually by console)
+  // console.log('Subsolar lat/lon:', sub, 'Columbia daylight?', columbiaInDaylight);
+
+  updateSatellitePositions();
+
   renderer.render(scene, camera);
 }
 
