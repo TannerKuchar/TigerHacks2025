@@ -34,18 +34,6 @@
       color: #ff0000;
     }
     
-    #satelliteInfo .close {
-      float: right;
-      cursor: pointer;
-      font-size: 20px;
-      font-weight: bold;
-      color: #ccc;
-    }
-    
-    #satelliteInfo .close:hover {
-      color: white;
-    }
-    
     #satelliteInfo .info-item {
       margin: 10px 0;
     }
@@ -145,7 +133,6 @@
 
 <body>
   <div id="satelliteInfo">
-    <span class="close" onclick="closeSatelliteInfo()">&times;</span>
     <h3 id="satelliteName">Satellite Information</h3>
     <div id="satelliteDetails"></div>
   </div>
@@ -175,15 +162,23 @@
   <p id="no-favorites" style="color: #aaa; font-size: 12px; margin: 5px 0;">No favorites yet</p>
   </div>
 
-  <input id="satSearch"
-         placeholder="Search satellites…"
-         style="position:absolute;
-                top:10px;
-                left:10px;
-                z-index:999;
-                padding:5px 8px;
-                font-size:14px;
-                width:220px;">
+  <!-- REMOVED THE DUPLICATE SEARCH BAR FROM HERE -->
+                
+  <div style="position:absolute; top:10px; left:10px; z-index:999; display:flex; gap:10px;">
+    <input id="satSearch"
+          placeholder="Search satellites…"
+          style="padding:5px 8px; font-size:14px; width:220px;">
+    
+    <button id="toggle-orbits-btn" 
+            style="padding:5px 10px; font-size:14px; background:#FF9800; color:white; border:none; border-radius:4px; cursor:pointer;">
+      Hide Orbits
+    </button>
+    
+    <button id="toggle-coverage-btn" 
+            style="padding:5px 10px; font-size:14px; background:#2196F3; color:white; border:none; border-radius:4px; cursor:pointer;">
+      Hide Coverage
+    </button>
+  </div>
   
   <script type="module" src="/main.js"></script>
 </body>
