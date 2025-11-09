@@ -59,7 +59,6 @@ const initialAngle = 0          //optional if you need a starting offset
 // --- SCENE SETUP / GEOMETRY ---
 const earthMesh = new THREE.Mesh(geometry, material);
 earthGroup.add(earthMesh)  // relates child to group
-scene.add(earthGroup)      // puts that whole bundle into the scene
 
 // Lights overlay
 const lightsMat = new THREE.MeshBasicMaterial({
