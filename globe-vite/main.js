@@ -926,7 +926,7 @@ async function showSatelliteInfo(satelliteMesh) {
           <span class="info-label">Name:</span> ${info.name}
         </div>
         <div class="info-item">
-          <span class="info-label">Country:</span> ${country}
+          <span class="info-label">Owner:</span> ${country}
         </div>
         <div class="info-item">
           <span class="info-label">Position:</span> 
