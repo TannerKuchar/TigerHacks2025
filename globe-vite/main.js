@@ -11,7 +11,14 @@ if (!supabaseUrl || !supabaseKey) {
   console.error('Missing Supabase credentials')
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
+    storage: window.localStorage
+  }
+});
 
 async function initializeFavoritesTable() {
   // This will be handled in Supabase dashboard - see instructions below
@@ -527,12 +534,12 @@ function drawSatelliteOrbit(idx) {
   if (!satrec) return;
 
   const points = [];
+  const colors = [];
   const now = new Date();
   const earthRadiusKm = 6371;
-  const scale = 1 / earthRadiusKm; // since your globe radius is 1
+  const scale = 1 / earthRadiusKm;
 
-  // Sample 1440 points along the orbit, 1 minute apart
-  // Equivalent to one day / 24 hrs
+  // Sample 1440 points along the orbit, 1 minute apart (one full day)
   for (let i = 0; i <= 1440; i++) {
     const futureDate = new Date(now.getTime() + i * 60 * 1000);
     const pv = satellite.propagate(satrec, futureDate);
@@ -544,10 +551,28 @@ function drawSatelliteOrbit(idx) {
       ecef.y * scale,
       ecef.z * scale
     ));
+
+    // Calculate color based on time progress (0 to 1)
+    const progress = i / 1440;
+    
+    const r = progress;           // 0 -> 1 (green to red)
+    const g = 1 - progress;       // 1 -> 0 (green fades out)
+    const b = 0;                  // stays 0
+    
+    colors.push(r, g, b);
   }
 
   const geometry = new THREE.BufferGeometry().setFromPoints(points);
-  const material = new THREE.LineBasicMaterial({ color: 0x00ff00 });
+  
+  // Add color attribute to geometry
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  
+  // Use vertexColors to enable per-vertex coloring
+  const material = new THREE.LineBasicMaterial({ 
+    vertexColors: true,
+    linewidth: 2
+  });
+  
   const orbitLine = new THREE.Line(geometry, material);
   scene.add(orbitLine);
 

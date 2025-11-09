@@ -13,8 +13,8 @@
     
     #satelliteInfo {
       position: fixed;
-      top: 20px;
-      right: 20px;
+      top: 50px;
+      left: 20px;
       background: rgba(0, 0, 0, 0.8);
       color: white;
       padding: 20px;
@@ -75,13 +75,62 @@
       border: none;
       border-radius: 4px;
       cursor: pointer;
-      background: #4CAF50;
       color: white;
       font-size: 14px;
+      transition: all 0.2s ease;
     }
 
-    #auth-controls button:hover {
-      background: #45a049;
+    #login-btn {
+      background: linear-gradient(135deg, #4CAF50, #388E3C);
+    }
+
+    #login-btn:hover {
+      background: linear-gradient(135deg, #66BB6A, #4CAF50);
+      transform: scale(1.05);
+      box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+    }
+
+    #logout-btn {
+      background: linear-gradient(135deg, #f44336, #d32f2f);
+    }
+
+    #logout-btn:hover {
+      background: linear-gradient(135deg, #ef5350, #e53935);
+      transform: scale(1.05);
+      box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+    }
+
+    /* Favorites item hover */
+    .fav-item:hover {
+      background: rgba(255, 255, 255, 0.2) !important;
+      transform: scale(1.02);
+    }
+
+    /* Remove fav hover */
+    .remove-fav:hover {
+      background: linear-gradient(135deg, #d32f2f, #b71c1c) !important;
+      transform: scale(1.1) !important;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3) !important;
+    }
+
+    /* Favorite btn hover */
+    #favorite-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+
+    /* Search input styling */
+    #satSearch {
+      background: rgba(255,255,255,0.9);
+      border: none;
+      border-radius: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      transition: all 0.3s ease;
+    }
+
+    #satSearch:focus {
+      width: 250px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
     }
   </style>
   <script type="importmap">
