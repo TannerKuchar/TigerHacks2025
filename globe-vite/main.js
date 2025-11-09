@@ -491,9 +491,11 @@ if (searchEl) {
     if (!name.includes(q)) {
       if (activeSatellite.userData.orbitLine) {
         scene.remove(activeSatellite.userData.orbitLine);
+        scene.remove(activeSatellite.userData.coverageCircle);
         activeSatellite.userData.orbitLine.geometry.dispose();
         activeSatellite.userData.orbitLine.material.dispose();
         delete activeSatellite.userData.orbitLine;
+        delete activeSatellite.userData.coverageCircle;
       }
       activeSatellite.material.color.set(0xff0000);
       activeSatellite = null;
