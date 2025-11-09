@@ -407,10 +407,28 @@ const searchEl = document.getElementById("satSearch");
 if (searchEl) {
   searchEl.addEventListener("input", () => {
     const q = searchEl.value.toLowerCase();
+
+    // Reset activeSatellite
+    if (activeSatellite) {
+      activeSatellite.material.color.set(0xff0000); // back to red
+      activeSatellite = null;
+    }
+
+    // Hide all satellites and their orbital paths that don’t match the search
     satelliteMeshes.forEach((mesh, i) => {
       const name = satelliteInfo[i]?.name?.toLowerCase() || "";
-      mesh.visible = q === "" || name.includes(q);
+      const visible = q === "" || name.includes(q);
+      mesh.visible = visible;
+
+      // Hide orbit if it exists
+      if(mesh.userData.orbitLine) {
+        mesh.userData.orbitLine.visible = visible;
+      }
     });
+
+    // Hide info panel if one was open
+    const infoPanel = document.getElementById('satelliteInfo');
+    if (infoPanel) infoPanel.classList.remove('visible');
   });
 }
 
@@ -434,29 +452,32 @@ function positionTestSatellite(mesh, lat, lon, alt = 1.1) {
 // Initialize satellites
 async function initializeRealSatellites() {
   console.log('initializeRealSatellites called, satellite available:', !!satellite);
-  if(!satellite) return;
+  if (!satellite) return;
 
-  // Clear test satellites
-  satelliteMeshes.forEach(m=>satelliteGroup.remove(m));
-  satelliteMeshes.length=0;
-  satelliteTLEs.length=0;
-  satelliteInfo.length=0;
+  // Clear old satellites
+  satelliteMeshes.forEach(m => satelliteGroup.remove(m));
+  satelliteMeshes.length = 0;
+  satelliteTLEs.length = 0;
+  satelliteInfo.length = 0;
 
   const tles = await fetchTLEsBatch();
-  console.log('Fetched TLEs:', tles.length);
-  if(!tles.length) return;
+  if (!tles.length) return;
 
   tles.forEach((tle, idx) => {
-  const mesh = createSatelliteMesh(); // NEW MATERIAL PER SATELLITE
-  mesh.userData = { isTest: false, name: tle.name, index: idx };
-  satelliteGroup.add(mesh);
-  satelliteMeshes.push(mesh);
-  satelliteTLEs.push(tle.satrec);
-  satelliteInfo.push(tle);
-});
+    const mesh = createSatelliteMesh(); 
+    mesh.userData = { 
+      isTest: false, 
+      name: tle.name, 
+      index: idx, 
+      catId: tle.noradId || tle.satrec?.satnum?.toString() // ✅ assign here
+    };
+    satelliteGroup.add(mesh);
+    satelliteMeshes.push(mesh);
+    satelliteTLEs.push(tle.satrec);
+    satelliteInfo.push(tle);
+  });
 
   console.log('Created', satelliteMeshes.length, 'satellite meshes');
-  console.log('SatelliteGroup children:', satelliteGroup.children.length);
   updateSatellitePositions(); // initial placement
 }
 
