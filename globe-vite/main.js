@@ -537,7 +537,7 @@ function positionTestSatellite(mesh, lat, lon, alt = 1.1) {
 // Initialize satellites
 async function initializeRealSatellites() {
   console.log('initializeRealSatellites called, satellite available:', !!satellite);
-  if(!satellite) return;
+  if (!satellite) return;
 
   // Clear test satellites and arrays
   satelliteMeshes.forEach(m=>satelliteGroup.remove(m));
@@ -548,12 +548,16 @@ async function initializeRealSatellites() {
   coverageCircles.length=0;
 
   const tles = await fetchTLEsBatch();
-  console.log('Fetched TLEs:', tles.length);
-  if(!tles.length) return;
+  if (!tles.length) return;
 
   tles.forEach((tle, idx) => {
-    const mesh = createSatelliteMesh();
-    mesh.userData = { isTest: false, name: tle.name, index: idx };
+    const mesh = createSatelliteMesh(); 
+    mesh.userData = { 
+      isTest: false, 
+      name: tle.name, 
+      index: idx, 
+      catId: tle.noradId || tle.satrec?.satnum?.toString() // ✅ assign here
+    };
     satelliteGroup.add(mesh);
     satelliteMeshes.push(mesh);
     satelliteTLEs.push(tle.satrec);
@@ -565,7 +569,6 @@ async function initializeRealSatellites() {
   });
 
   console.log('Created', satelliteMeshes.length, 'satellite meshes');
-  console.log('SatelliteGroup children:', satelliteGroup.children.length);
   updateSatellitePositions(); // initial placement
 }
 
@@ -1162,9 +1165,10 @@ function animate() {
   // optional logging for verification (throttled visually by console)
   // console.log('Subsolar lat/lon:', sub, 'Columbia daylight?', columbiaInDaylight);
 
+  // update satellite positions continuously
   updateSatellitePositions();
-
   renderer.render(scene, camera);
+
 }
 
 animate();
