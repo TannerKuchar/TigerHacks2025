@@ -495,6 +495,13 @@ if (searchEl) {
         activeSatellite.userData.orbitLine.material.dispose();
         delete activeSatellite.userData.orbitLine;
       }
+
+      if (activeSatellite.userData.coverageCircle) {
+        scene.remove(activeSatellite.userData.coverageCircle);
+        activeSatellite.userData.coverageCircle.geometry.dispose();
+        activeSatellite.userData.coverageCircle.material.dispose();
+        delete activeSatellite.userData.coverageCircle;
+      }
       activeSatellite.material.color.set(0xff0000);
       activeSatellite = null;
     }
