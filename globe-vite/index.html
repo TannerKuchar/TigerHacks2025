@@ -13,8 +13,8 @@
     
     #satelliteInfo {
       position: fixed;
-      top: 20px;
-      right: 20px;
+      top: 50px;
+      left: 20px;
       background: rgba(0, 0, 0, 0.8);
       color: white;
       padding: 20px;
@@ -32,18 +32,6 @@
     #satelliteInfo h3 {
       margin-top: 0;
       color: #ff0000;
-    }
-    
-    #satelliteInfo .close {
-      float: right;
-      cursor: pointer;
-      font-size: 20px;
-      font-weight: bold;
-      color: #ccc;
-    }
-    
-    #satelliteInfo .close:hover {
-      color: white;
     }
     
     #satelliteInfo .info-item {
@@ -75,13 +63,62 @@
       border: none;
       border-radius: 4px;
       cursor: pointer;
-      background: #4CAF50;
       color: white;
       font-size: 14px;
+      transition: all 0.2s ease;
     }
 
-    #auth-controls button:hover {
-      background: #45a049;
+    #login-btn {
+      background: linear-gradient(135deg, #4CAF50, #388E3C);
+    }
+
+    #login-btn:hover {
+      background: linear-gradient(135deg, #66BB6A, #4CAF50);
+      transform: scale(1.05);
+      box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+    }
+
+    #logout-btn {
+      background: linear-gradient(135deg, #f44336, #d32f2f);
+    }
+
+    #logout-btn:hover {
+      background: linear-gradient(135deg, #ef5350, #e53935);
+      transform: scale(1.05);
+      box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+    }
+
+    /* Favorites item hover */
+    .fav-item:hover {
+      background: rgba(255, 255, 255, 0.2) !important;
+      transform: scale(1.02);
+    }
+
+    /* Remove fav hover */
+    .remove-fav:hover {
+      background: linear-gradient(135deg, #d32f2f, #b71c1c) !important;
+      transform: scale(1.1) !important;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3) !important;
+    }
+
+    /* Favorite btn hover */
+    #favorite-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+
+    /* Search input styling */
+    #satSearch {
+      background: rgba(255,255,255,0.9);
+      border: none;
+      border-radius: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      transition: all 0.3s ease;
+    }
+
+    #satSearch:focus {
+      width: 250px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
     }
   </style>
   <script type="importmap">
@@ -96,7 +133,6 @@
 
 <body>
   <div id="satelliteInfo">
-    <span class="close" onclick="closeSatelliteInfo()">&times;</span>
     <h3 id="satelliteName">Satellite Information</h3>
     <div id="satelliteDetails"></div>
   </div>
@@ -126,15 +162,23 @@
   <p id="no-favorites" style="color: #aaa; font-size: 12px; margin: 5px 0;">No favorites yet</p>
   </div>
 
-  <input id="satSearch"
-         placeholder="Search satellites…"
-         style="position:absolute;
-                top:10px;
-                left:10px;
-                z-index:999;
-                padding:5px 8px;
-                font-size:14px;
-                width:220px;">
+  <!-- REMOVED THE DUPLICATE SEARCH BAR FROM HERE -->
+                
+  <div style="position:absolute; top:10px; left:10px; z-index:999; display:flex; gap:10px;">
+    <input id="satSearch"
+          placeholder="Search satellites…"
+          style="padding:5px 8px; font-size:14px; width:220px;">
+    
+    <button id="toggle-orbits-btn" 
+            style="padding:5px 10px; font-size:14px; background:#FF9800; color:white; border:none; border-radius:4px; cursor:pointer;">
+      Hide Orbits
+    </button>
+    
+    <button id="toggle-coverage-btn" 
+            style="padding:5px 10px; font-size:14px; background:#2196F3; color:white; border:none; border-radius:4px; cursor:pointer;">
+      Hide Coverage
+    </button>
+  </div>
   
   <script type="module" src="/main.js"></script>
 </body>
