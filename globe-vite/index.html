@@ -54,6 +54,35 @@
       font-weight: bold;
       color: #aaa;
     }
+
+    /* Auth controls styling */
+    #auth-controls {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 999;
+      background: rgba(0, 0, 0, 0.6);
+      color: white;
+      padding: 8px 12px;
+      border-radius: 8px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    #auth-controls button {
+      padding: 5px 12px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      background: #4CAF50;
+      color: white;
+      font-size: 14px;
+    }
+
+    #auth-controls button:hover {
+      background: #45a049;
+    }
   </style>
   <script type="importmap">
       {
@@ -71,8 +100,32 @@
     <h3 id="satelliteName">Satellite Information</h3>
     <div id="satelliteDetails"></div>
   </div>
-  <script type="module" src="main.js"></script>
-<!-- Search input for satellites -->
+
+  <div id="auth-controls">
+    <button id="login-btn">Log in</button>
+    <button id="logout-btn" style="display:none;">Log out</button>
+    <span id="user-name"></span>
+  </div>
+
+<div id="favorites-panel" style="
+  position: absolute;
+  top: 60px;
+  right: 10px;
+  z-index: 999;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 12px;
+  border-radius: 8px;
+  max-width: 250px;
+  max-height: 400px;
+  overflow-y: auto;
+  display: none;
+">
+  <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #4CAF50;">★ Favorites</h3>
+  <div id="favorites-list"></div>
+  <p id="no-favorites" style="color: #aaa; font-size: 12px; margin: 5px 0;">No favorites yet</p>
+  </div>
+
   <input id="satSearch"
          placeholder="Search satellites…"
          style="position:absolute;
