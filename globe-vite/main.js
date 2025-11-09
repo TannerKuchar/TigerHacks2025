@@ -852,9 +852,10 @@ function animate() {
   // optional logging for verification (throttled visually by console)
   // console.log('Subsolar lat/lon:', sub, 'Columbia daylight?', columbiaInDaylight);
 
+  // update satellite positions continuously
   updateSatellitePositions();
-
   renderer.render(scene, camera);
+
 }
 
 animate();
