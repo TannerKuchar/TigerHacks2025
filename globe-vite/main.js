@@ -92,7 +92,7 @@ scene.add(stars);
 
 async function fetchTLEsBatch() {
   try {
-    const response = await fetch("/active.json"); // local file in public folder
+    const response = await fetch("/active_with_country.json"); // local file in public folder
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     
     const jsonData = await response.json();
@@ -115,7 +115,7 @@ async function fetchTLEsBatch() {
       }
     }
 
-    console.log(`Loaded ${tles.length} satellites from active.json`);
+    console.log(`Loaded ${tles.length} satellites from active_with_country.json`);
     return tles;
   } catch (e) {
     console.error("TLE JSON load error:", e);
@@ -152,7 +152,6 @@ function ecefToGlobeCoords(ecef, earthRadius = 1) {
   };
 }
 
-// Create satellite group and meshes
 // Create satellite group and meshes
 const satelliteGroup = new THREE.Group();
 scene.add(satelliteGroup); // CRITICAL: Add to scene
@@ -446,40 +445,45 @@ function onMouseMove(event) {
 
 // Click handler
 function onMouseClick(event) {
-  // Close info panel
-  window.closeSatelliteInfo();
-
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
   raycaster.setFromCamera(mouse, camera);
-
   const intersects = raycaster.intersectObjects(satelliteMeshes);
 
-  // Always remove the current orbit line if it exists
-  if (activeSatellite?.userData?.orbitLine) {
-    scene.remove(activeSatellite.userData.orbitLine);
-    activeSatellite.userData.orbitLine.geometry.dispose();
-    activeSatellite.userData.orbitLine.material.dispose();
-    delete activeSatellite.userData.orbitLine;
+  if (intersects.length === 0) {
+    return; // no satellite clicked
   }
 
+  const clickedSatellite = intersects[0].object;
+
+  // If the same satellite is clicked again, do nothing
+  if (activeSatellite === clickedSatellite) {
+    return;
+  }
+
+  // If a different satellite was active before, reset it
   if (activeSatellite) {
-      activeSatellite.material.color.set(0xff0000); // back to red
+    activeSatellite.material.color.set(0xff0000); // reset to red
+
+    // Remove the old orbit line
+    if (activeSatellite.userData?.orbitLine) {
+      scene.remove(activeSatellite.userData.orbitLine);
+      activeSatellite.userData.orbitLine.geometry.dispose();
+      activeSatellite.userData.orbitLine.material.dispose();
+      delete activeSatellite.userData.orbitLine;
     }
-  
-  if (intersects.length > 0) {
-    const clickedSatellite = intersects[0].object;
-
-    // Set new active satellite
-    activeSatellite = clickedSatellite;
-    activeSatellite.material.color.set(0x00ff00); // green
-
-    showSatelliteInfo(activeSatellite);
-
-    // Draw orbit for the clicked satellite
-    drawSatelliteOrbit(activeSatellite.userData.index);
   }
+
+  // Set new active satellite
+  activeSatellite = clickedSatellite;
+  activeSatellite.material.color.set(0x00ff00); // highlight green
+
+  // Show info panel
+  showSatelliteInfo(activeSatellite);
+
+  // Draw orbit for the newly clicked satellite
+  drawSatelliteOrbit(activeSatellite.userData.index);
 }
 
 // Show satellite information
