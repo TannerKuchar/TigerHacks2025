@@ -427,7 +427,8 @@ async function fetchTLEsBatch() {
             name: entry.name,
             line1: entry.line1,
             line2: entry.line2,
-            satrec
+            satrec,
+            country: entry.country
           });
         }
       } catch (err) {
@@ -917,12 +918,13 @@ async function showSatelliteInfo(satelliteMesh) {
     const favorited = await isFavorited(name);
     
     if (info) {
+      const country = info.country && info.country.trim() !== "" ? info.country : "Unknown";
       html += `
         <div class="info-item">
           <span class="info-label">Name:</span> ${info.name}
         </div>
         <div class="info-item">
-          <span class="info-label">Type:</span> Real Satellite
+          <span class="info-label">Country:</span> ${country}
         </div>
         <div class="info-item">
           <span class="info-label">Position:</span> 
